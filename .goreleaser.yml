@@ -64,13 +64,10 @@ nfpms:
     # License type (from README)
     license: MIT
     vendor: 'Neverinstall, Inc.'
-    # Files to include in the package
+    # Using bindir instead of explicitly specifying binary path
+    bindir: /usr/local/bin
+    # Additional files to include in the package
     contents:
-      # Binary destination - Fixed path to match actual binary location
-      - src: "./dist/{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}/{{ .ProjectName }}"
-        dst: /usr/local/bin/kubeglass
-        file_info:
-          mode: 0755 # Executable permissions
       # Documentation files
       - src: README.md
         dst: /usr/share/doc/kubeglass/README.md
