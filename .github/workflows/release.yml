@@ -46,11 +46,13 @@ jobs:
           echo "Content of /usr/include/linux/types.h:"
           head -n 10 /usr/include/linux/types.h || echo "File not found"
 
-      - name: Create asm symlink
+      - name: Create asm symlinks
         run: |
+          # Instead of individual symlinks, copy the entire asm directory structure
           sudo mkdir -p /usr/include/asm
-          sudo ln -sf /usr/include/x86_64-linux-gnu/asm/types.h /usr/include/asm/types.h
-          ls -la /usr/include/asm/types.h || echo "Failed to create symlink"
+          sudo cp -r /usr/include/x86_64-linux-gnu/asm/* /usr/include/asm/
+          echo "Copied all asm headers to /usr/include/asm/"
+          ls -la /usr/include/asm/ | head
 
       - name: Create clang wrapper
         run: |
