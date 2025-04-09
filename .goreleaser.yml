@@ -66,8 +66,8 @@ nfpms:
     vendor: 'Neverinstall, Inc.'
     # Files to include in the package
     contents:
-      # Binary destination
-      - src: "./dist/kubeglass_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}/kubeglass"
+      # Binary destination - Fixed path to match actual binary location
+      - src: "{{ .Env.PWD }}/dist/kubeglass_{{ .Version }}_{{ .Os }}_{{ .Arch }}/kubeglass"
         dst: /usr/local/bin/kubeglass
         file_info:
           mode: 0755 # Executable permissions
