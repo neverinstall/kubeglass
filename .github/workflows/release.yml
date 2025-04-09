@@ -52,5 +52,5 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          BPF_CFLAGS: "-I/usr/include -I/usr/local/include -I/usr/src/linux-headers-$(uname -r)/include -I/usr/src/linux-headers-$(uname -r)/arch/$(dpkg --print-architecture)/include"
+          BPF_CFLAGS: "-I/usr/include -I/usr/include/x86_64-linux-gnu"
           CGO_ENABLED: "1" 
