@@ -46,11 +46,25 @@ jobs:
           echo "Content of /usr/include/linux/types.h:"
           head -n 10 /usr/include/linux/types.h || echo "File not found"
 
+      - name: Create asm symlink
+        run: |
+          sudo mkdir -p /usr/include/asm
+          sudo ln -sf /usr/include/x86_64-linux-gnu/asm/types.h /usr/include/asm/types.h
+          ls -la /usr/include/asm/types.h || echo "Failed to create symlink"
+
+      - name: Create clang wrapper
+        run: |
+          echo '#!/bin/bash
+          /usr/bin/clang -idirafter /usr/include/x86_64-linux-gnu "$@"' | sudo tee /usr/local/bin/clang-wrapper
+          sudo chmod +x /usr/local/bin/clang-wrapper
+          echo "Created clang wrapper at /usr/local/bin/clang-wrapper"
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          BPF_CFLAGS: "-I/usr/include -I/usr/include/x86_64-linux-gnu"
+          BPF_CLANG: "/usr/local/bin/clang-wrapper"
+          BPF_CFLAGS: "-I/usr/include"
           CGO_ENABLED: "1" 
