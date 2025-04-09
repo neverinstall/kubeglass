@@ -1,0 +1,117 @@
+project_name: kubeglass
+
+# Before hook runs commands before the build process
+before:
+  hooks:
+    # Ensure build dependencies are present (useful if running locally, CI handles this)
+    # - go mod tidy
+    # Generate eBPF code - This is crucial
+    - go generate ./cmd/kubeglass/...
+
+# Build configuration
+builds:
+  - # Unique ID for the build
+    id: kubeglass
+    # Source directory for the main package
+    main: ./cmd/kubeglass/
+    # Output binary name
+    binary: kubeglass
+    # Environment variables for the build
+    env:
+      - CGO_ENABLED=1
+    # Go Operating Systems to build for
+    goos:
+      - linux
+    # Go Architectures to build for
+    goarch:
+      - amd64
+      - arm64
+    # Flags passed to the go build command
+    ldflags:
+      - -s -w # Strip debug symbols and DWARF info for smaller binary size
+
+# Archive configuration (e.g., creating .tar.gz files)
+archives:
+  - # Unique ID for the archive config
+    id: kubeglass-archive
+    # Builds to include in the archive
+    builds:
+      - kubeglass
+    # Example: kubeglass_1.0.0_linux_amd64.tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    # Format of the archive
+    format: tar.gz
+    # Files to include besides the binary
+    files:
+      - README.md
+      - LICENSE # Assuming you have a LICENSE file
+
+# Configuration for nfpm (for generating .deb and .rpm packages)
+nfpms:
+  - # Unique ID for the nfpm config
+    id: kubeglass-nfpm
+    # Builds to package
+    builds:
+      - kubeglass
+    # Package name
+    package_name: kubeglass
+    # Maintainer information (replace with actual info)
+    maintainer: 'Lakshmana Pasala <lakshmana@neverinstall.com>'
+    # Short package description
+    description: 'eBPF-based tool to monitor process file descriptor writes.'
+    # Homepage URL
+    homepage: 'https://github.com/neverinstall/kubeglass' # Replace if different
+    # License type (from README)
+    license: MIT
+    vendor: 'Neverinstall, Inc.'
+    # Files to include in the package
+    contents:
+      # Binary destination
+      - src: /usr/local/bin/kubeglass
+        dst: /usr/local/bin/kubeglass
+        file_info:
+          mode: 0755 # Executable permissions
+      # Documentation files
+      - src: README.md
+        dst: /usr/share/doc/kubeglass/README.md
+      - src: LICENSE # Assuming you have a LICENSE file
+        dst: /usr/share/doc/kubeglass/LICENSE
+    # Formats to generate
+    formats:
+      - deb
+      - rpm
+    # Format-specific overrides
+    overrides:
+      deb:
+        dependencies:
+          - libelf1
+      rpm:
+        dependencies:
+          - elfutils-libs
+
+# Checksum generation configuration
+checksum:
+  # Algorithm to use (sha256 is common)
+  algorithm: sha256
+  # Naming template for the checksum file
+  name_template: 'checksums.txt'
+
+# Snapshot configuration (for testing releases without tagging)
+snapshot:
+  # Naming template for snapshot releases (e.g., based on commit hash)
+  name_template: "{{ incpatch .Version }}-next"
+
+# Changelog generation configuration
+changelog:
+  # Skip changelog generation (can be enabled later)
+  # skip: true
+  sort: asc
+  # filters:
+  #   exclude:
+  #     - '^docs:'
+  #     - '^test:'
+
+# Release configuration (integration with GitHub Releases)
+release:
+  draft: false
+  prerelease: auto

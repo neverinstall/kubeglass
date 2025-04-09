@@ -142,6 +142,65 @@ If you don't see any output, verify:
 2. The process is actually writing to file descriptors
 3. You have the correct PID
 
+## Testing
+
+The project includes comprehensive tests for both the Go application code and BPF program.
+
+### Running Unit Tests
+
+```bash
+# Run Go unit tests for the main application
+cd cmd/kubeglass
+go test -v
+
+# Run BPF-specific tests
+cd ../../test
+go test -v
+```
+
+### Running Integration Tests
+
+Some tests require root privileges to load BPF programs:
+
+```bash
+sudo go test -v ./...
+go test -v -short ./...
+```
+
+### Test Coverage
+
+Generate test coverage reports:
+
+```bash
+go test -v -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+```
+
+## Docker Usage
+
+You can also build and run kubeglass using Docker. This encapsulates dependencies but requires running the container with specific privileges to interact with the host system's kernel for eBPF operations.
+
+### Building the Docker Image
+
+```bash
+docker build -t kubeglass .
+```
+
+### Running the Docker Container
+
+To monitor processes on the host system, the container needs access to the host's PID namespace and privileges for eBPF.
+
+```bash
+# Example: Monitor PID 1234 on the host
+sudo docker run --rm -it --pid=host --privileged kubeglass --pid 1234
+
+# Alternatively, using specific capabilities instead of --privileged (more secure)
+# Capabilities needed might vary, but typically include CAP_SYS_ADMIN and CAP_BPF
+sudo docker run --rm -it --pid=host --cap-add=SYS_ADMIN --cap-add=BPF kubeglass --pid 1234
+```
+
+**Note:** Running Docker containers with `--privileged` or extensive capabilities poses security risks. Understand the implications before using these options.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.

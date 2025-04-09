@@ -235,9 +235,16 @@ func formatData(data []byte) string {
 		return "<empty>"
 	}
 
-	// If the data is all printable ASCII or standard whitespace, show as string
+	// Check if data contains null bytes but is otherwise printable
+	nullByteIndex := bytes.IndexByte(data, 0)
+	containsNullByte := nullByteIndex >= 0
+
+	// If the data is all printable ASCII or standard whitespace (except perhaps null bytes), show as string
 	isPrintable := true
 	for _, b := range data {
+		if b == 0 {
+			continue // Skip null bytes for printability check
+		}
 		if b != '\n' && b != '\r' && b != '\t' && !unicode.IsPrint(rune(b)) {
 			isPrintable = false
 			break
@@ -245,6 +252,11 @@ func formatData(data []byte) string {
 	}
 
 	if isPrintable {
+		// If it contains null bytes, truncate at first null
+		if containsNullByte {
+			data = data[:nullByteIndex]
+		}
+
 		// Truncate trailing nulls and format line endings
 		cleanData := bytes.TrimRight(data, "\x00")
 		formattedData := strings.ReplaceAll(string(cleanData), "\n", "\\n")
