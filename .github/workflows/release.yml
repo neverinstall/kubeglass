@@ -34,7 +34,7 @@ jobs:
         # These are needed for CGO_ENABLED=1 and compiling the BPF C code
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential clang llvm libelf-dev linux-headers-$(uname -r) linux-libc-dev
+          sudo apt-get install -y --no-install-recommends build-essential clang llvm libelf-dev linux-headers-$(uname -r) linux-libc-dev libbpf-dev
       
       - name: Debug Headers
         run: |
