@@ -67,7 +67,7 @@ nfpms:
     # Files to include in the package
     contents:
       # Binary destination
-      - src: /usr/local/bin/kubeglass
+      - src: "./dist/kubeglass_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}/kubeglass"
         dst: /usr/local/bin/kubeglass
         file_info:
           mode: 0755 # Executable permissions
