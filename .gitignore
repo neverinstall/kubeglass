@@ -1,0 +1,6 @@
+.vscode/
+bin/
+dist/
+kubeglass
+bpf_bpfel.go
+*.o

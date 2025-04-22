@@ -1,0 +1,75 @@
+project_name: kubeglass
+
+before:
+  hooks:
+    - go generate ./cmd/kubeglass/...
+
+builds:
+  - id: kubeglass
+    main: ./cmd/kubeglass/
+    binary: kubeglass
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+archives:
+  - id: kubeglass-archive
+    builds:
+      - kubeglass
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
+    files:
+      - README.md
+      - LICENSE
+
+nfpms:
+  - id: kubeglass-nfpm
+    builds:
+      - kubeglass
+    package_name: kubeglass
+    maintainer: 'Lakshmana Pasala <lakshmana@neverinstall.com>'
+    description: 'eBPF-based tool to monitor process file descriptor writes.'
+    homepage: 'https://github.com/neverinstall/kubeglass'
+    license: MIT
+    vendor: 'Neverinstall, Inc.'
+    bindir: /usr/local/bin
+    contents:
+      - src: README.md
+        dst: /usr/share/doc/kubeglass/README.md
+      - src: LICENSE
+        dst: /usr/share/doc/kubeglass/LICENSE
+    formats:
+      - deb
+      - rpm
+    overrides:
+      deb:
+        dependencies:
+          - libelf1
+      rpm:
+        dependencies:
+          - elfutils-libs
+
+checksum:
+  algorithm: sha256
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  # skip: true
+  # filters:
+  #   exclude:
+  #     - '^docs:'
+  #     - '^test:'
+
+release:
+  draft: false
+  prerelease: auto

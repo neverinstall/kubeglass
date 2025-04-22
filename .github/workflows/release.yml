@@ -1,0 +1,71 @@
+name: GoReleaser Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+env:
+    GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: true
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Install eBPF/C build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential clang llvm libelf-dev linux-headers-$(uname -r) linux-libc-dev libbpf-dev
+      
+      - name: Debug Headers
+        run: |
+          echo "Kernel version: $(uname -r)"
+          echo "Architecture: $(dpkg --print-architecture)"
+          echo "Checking for header locations:"
+          find /usr/include -name "types.h" | grep -E 'linux|asm'
+          find /usr/src -name "types.h" | grep -E 'linux|asm'
+          echo "Content of /usr/include/linux/types.h:"
+          head -n 10 /usr/include/linux/types.h || echo "File not found"
+
+      - name: Create asm symlinks
+        run: |
+          # Instead of individual symlinks, copy the entire asm directory structure
+          sudo mkdir -p /usr/include/asm
+          sudo cp -r /usr/include/x86_64-linux-gnu/asm/* /usr/include/asm/
+          echo "Copied all asm headers to /usr/include/asm/"
+          ls -la /usr/include/asm/ | head
+
+      - name: Create clang wrapper
+        run: |
+          echo '#!/bin/bash
+          /usr/bin/clang -idirafter /usr/include/x86_64-linux-gnu "$@"' | sudo tee /usr/local/bin/clang-wrapper
+          sudo chmod +x /usr/local/bin/clang-wrapper
+          echo "Created clang wrapper at /usr/local/bin/clang-wrapper"
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          BPF_CLANG: "/usr/local/bin/clang-wrapper"
+          BPF_CFLAGS: "-I/usr/include"
+          CGO_ENABLED: "1" 
