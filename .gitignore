@@ -2,5 +2,6 @@
 bin/
 dist/
 kubeglass
+!*@kubeglass*
 bpf_bpfel.go
 *.o
