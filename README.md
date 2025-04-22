@@ -208,3 +208,10 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Future Scope
+
+- **Socket Monitoring**: Extend monitoring capabilities to network sockets and other I/O channels
+- **Enhanced Filtering**: Add more granular filtering options (regex patterns, content-based filters)
+- **Multi-Process Tracing**: Trace multiple PIDs simultaneously
+- **Log Rotation**: Implement log rotation for long-running captures
