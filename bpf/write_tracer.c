@@ -19,9 +19,8 @@ struct {
 } target_pid SEC(".maps");
 
 struct {
-    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-    __uint(key_size, sizeof(int));
-    __uint(value_size, sizeof(int));
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+    __uint(max_entries, 256 * 1024); // 256 KB
 } events SEC(".maps");
 
 // Built-in BPF tracing struct for safer context access
@@ -52,9 +51,8 @@ int trace_write(void *ctx) {
     if (count > 0)
         bpf_probe_read_user(event.data, count, buf_ptr);
     
-    bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
+    bpf_ringbuf_output(&events, &event, sizeof(event), 0);
     
     return 0;
 }
-
 char LICENSE[] SEC("license") = "GPL";

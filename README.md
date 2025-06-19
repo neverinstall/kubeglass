@@ -1,21 +1,19 @@
 # kubeglass
 
-kubeglass is an eBPF-based tool for Linux that allows you to monitor and capture file descriptor writes from any running process in real-time, without modifying the target application or its configuration.
+kubeglass is an eBPF-based tool for Linux that allows you to monitor and capture file descriptor writes from any running process in real-time via an interactive terminal UI.
 
 ## Features
 
-- Monitor any process by its PID
-- Filter specific file descriptors (stdout, stderr, or any custom FD)
-- View existing file content before starting capture
-- Filter out binary data for cleaner output
-- Suppress repeated messages to reduce noise
-- Format and display data in a human-readable way
+- **Interactive TUI:** A `bubbletea`-based terminal user interface for viewing live data streams.
+- **Real-time Monitoring:** Monitor any process by its PID.
+- **Interactive Filtering:** Filter events by file descriptor or with a regex pattern on the payload, all within the UI.
+- **Clean Output:** Toggle binary data filtering on the fly.
 
 ## Requirements
 
-- Linux kernel 5.5+ with eBPF support
+- **Linux kernel 5.8+** with eBPF support
 - Root privileges (for loading eBPF programs)
-- Go 1.16+
+- Go 1.21+
 - Clang compiler
 
 ## Installation
@@ -36,38 +34,31 @@ sudo ./kubeglass --pid <target_pid>
 
 ## Usage
 
-Basic usage:
+To start monitoring a process, simply provide its PID:
 
 ```bash
-# Monitor all file descriptor writes from a process
 sudo ./kubeglass --pid 1234
-
-# Monitor only stdout and stderr
-sudo ./kubeglass --pid 1234 --stdout --stderr
-
-# Monitor specific file descriptors
-sudo ./kubeglass --pid 1234 --fds=1,2,5
-
-# Show existing log content before starting monitoring
-sudo ./kubeglass --pid 1234 --existing --tail=20
-
-# Skip binary data and suppress repeated messages
-sudo ./kubeglass --pid 1234 --no-binary --no-repeats
 ```
+
+All other controls and filters are available within the interactive TUI.
 
 ## Command Line Options
 
 | Option | Description |
 |--------|-------------|
 | `--pid` | Target process ID to monitor (required) |
-| `--stdout` | Show stdout (fd 1) writes |
-| `--stderr` | Show stderr (fd 2) writes |
-| `--all` | Show all file descriptor writes (default) |
-| `--fds` | Comma-separated list of file descriptors to monitor |
-| `--no-repeats` | Suppress repeated identical messages |
-| `--no-binary` | Skip binary data that doesn't look like text |
-| `--existing` | Show existing content of FDs before tracing |
-| `--tail` | Number of lines to show from existing logs (default: 10) |
+
+## Interactive Controls
+
+| Key | Action |
+|-----|--------|
+| `q` / `ctrl+c` | Quit the application |
+| `?` | Toggle the help menu |
+| `/` | Enter filter mode (to type a regex) |
+| `enter` | Apply the regex filter |
+| `esc` | Clear the current filter |
+| `a` | Toggle showing all file descriptors |
+| `b` | Toggle filtering of binary data |
 
 ## Use Cases
 
@@ -102,7 +93,8 @@ kubeglass uses eBPF (extended Berkeley Packet Filter) technology to:
 1. Attach to the kernel's syscall tracepoints
 2. Monitor the `write` system call for the target process
 3. Capture the data being written to file descriptors
-4. Format and display the data in real-time
+4. Send events from the kernel to user-space via a high-performance eBPF ring buffer
+5. Display the data in a real-time, interactive terminal UI
 
 This approach is minimally invasive, with very low overhead compared to traditional debugging or tracing tools.
 
@@ -132,7 +124,7 @@ If you encounter eBPF verification errors, your kernel may have restrictions or 
 Loading BPF program: field TraceWrite: program trace_write: load program: invalid argument
 ```
 
-Try using a more recent kernel or check that eBPF syscall tracepoints are enabled.
+Try using a more recent kernel (5.8+) or check that eBPF syscall tracepoints are enabled.
 
 ### Process Not Monitored
 
@@ -164,7 +156,6 @@ Some tests require root privileges to load BPF programs:
 
 ```bash
 sudo go test -v ./...
-go test -v -short ./...
 ```
 
 ### Test Coverage
@@ -212,6 +203,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Future Scope
 
 - **Socket Monitoring**: Extend monitoring capabilities to network sockets and other I/O channels
-- **Enhanced Filtering**: Add more granular filtering options (regex patterns, content-based filters)
 - **Multi-Process Tracing**: Trace multiple PIDs simultaneously
+- **Persistent Configuration**: Allow setting default flags in a config file.
 - **Log Rotation**: Implement log rotation for long-running captures

@@ -1,7 +1,7 @@
 .vscode/
 bin/
 dist/
-kubeglass
+/kubeglass
 !*@kubeglass*
 bpf_bpfel.go
 *.o

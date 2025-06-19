@@ -1,0 +1,39 @@
+." kubeglass.1
+.TH kubeglass 1 "June 2025" "kubeglass" "User Commands"
+.SH NAME
+kubeglass \- an interactive eBPF tool for monitoring process I/O
+.SH SYNOPSIS
+.B kubeglass
+[\fB\-\-pid\fR \fIPID\fR]
+.SH DESCRIPTION
+\fBkubeglass\fR is an eBPF-based tool for Linux that allows you to monitor and capture file descriptor writes from any running process in real-time via an interactive terminal UI.
+It attaches to the kernel's write syscall and displays the data in a live, scrollable view.
+.SH OPTIONS
+.TP
+\fB\-\-pid\fR \fIPID\fR
+The process ID to trace. This is a required argument.
+.SH INTERACTIVE CONTROLS
+The TUI provides several interactive controls for filtering and navigation.
+.TP
+\fBq, ctrl+c\fR
+Quit the application.
+.TP
+\fB?\fR
+Toggle the help menu.
+.TP
+\fB/\fR
+Enter filter mode to type a regex pattern. Press Enter to apply.
+.TP
+\fBesc\fR
+Clear the current regex filter.
+.TP
+\fBa\fR
+Toggle showing all file descriptors.
+.TP
+\fBb\fR
+Toggle filtering of binary (non-printable) data.
+.SH SEE ALSO
+.BR dmesg (1),
+.BR strace (1)
+.SH AUTHOR
+kubeglass was written by the Neverinstall team. 

@@ -44,6 +44,8 @@ nfpms:
         dst: /usr/share/doc/kubeglass/README.md
       - src: LICENSE
         dst: /usr/share/doc/kubeglass/LICENSE
+      - src: man/kubeglass.1
+        dst: /usr/share/man/man1/kubeglass.1
     formats:
       - deb
       - rpm

@@ -3,29 +3,32 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
-	"time"
 	"unicode"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/cilium/ebpf/link"
-	"github.com/cilium/ebpf/perf"
+	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
 )
 
-type writeEvent struct {
+type bpfWriteEvent struct {
 	PID     uint32
 	FD      uint32
 	Data    [240]byte
 	DataLen uint32
+}
+
+type Event struct {
+	PID     uint32 `json:"pid"`
+	FD      uint32 `json:"fd"`
+	Payload []byte `json:"payload"`
 }
 
 func main() {
@@ -35,58 +38,17 @@ func main() {
 	}
 
 	var targetPID int
-	var showStdout, showStderr, showAll bool
-	var targetFDs string
-	var suppressRepeats bool
-	var skipBinary bool
-	var showExisting bool
-	var tailLines int
-
 	flag.IntVar(&targetPID, "pid", 0, "PID to trace")
-	flag.BoolVar(&showStdout, "stdout", false, "Show stdout (fd 1) writes")
-	flag.BoolVar(&showStderr, "stderr", false, "Show stderr (fd 2) writes")
-	flag.BoolVar(&showAll, "all", true, "Show all file descriptor writes")
-	flag.StringVar(&targetFDs, "fds", "", "Comma-separated list of file descriptors to monitor (overrides other fd flags)")
-	flag.BoolVar(&suppressRepeats, "no-repeats", false, "Suppress repeated identical messages")
-	flag.BoolVar(&skipBinary, "no-binary", false, "Skip binary data that doesn't look like text")
-	flag.BoolVar(&showExisting, "existing", false, "Show existing content of FDs before tracing")
-	flag.IntVar(&tailLines, "tail", 10, "Number of lines to show from existing logs")
 	flag.Parse()
 
 	if targetPID <= 0 {
-		fmt.Fprintf(os.Stderr, "Usage: %s --pid=<pid> [--stdout] [--stderr] [--all] [--fds=1,2,5] [--no-repeats] [--no-binary] [--existing] [--tail=10]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s --pid=<pid>\n", os.Args[0])
 		os.Exit(1)
-	}
-
-	fdFilter := make(map[uint32]bool)
-	if targetFDs != "" {
-		showAll = false
-		fdList := strings.Split(targetFDs, ",")
-		for _, fdStr := range fdList {
-			var fd int
-			fmt.Sscanf(fdStr, "%d", &fd)
-			if fd > 0 {
-				fdFilter[uint32(fd)] = true
-			}
-		}
-	} else {
-		if showStdout {
-			showAll = false
-			fdFilter[1] = true
-		}
-		if showStderr {
-			showAll = false
-			fdFilter[2] = true
-		}
 	}
 
 	if _, err := os.Stat(fmt.Sprintf("/proc/%d", targetPID)); err != nil {
 		fmt.Fprintf(os.Stderr, "Process %d does not exist\n", targetPID)
 		os.Exit(1)
-	}
-
-	if showExisting {
-		showExistingLogs(targetPID, fdFilter, showAll, tailLines, skipBinary)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -112,115 +74,18 @@ func main() {
 	}
 	defer tp.Close()
 
-	rd, err := perf.NewReader(objs.Events, 4096)
+	rd, err := ringbuf.NewReader(objs.Events)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Creating perf event reader: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Creating ringbuf reader: %v\n", err)
 		os.Exit(1)
 	}
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
+	model := newTUIModel(ctx, rd)
+	p := tea.NewProgram(model, tea.WithAltScreen())
 
-	fmt.Printf("Tracing write syscalls from PID %d... Press Ctrl-C to exit\n", targetPID)
-	if !showAll {
-		fmt.Printf("Filtering FDs: ")
-		for fd := range fdFilter {
-			fmt.Printf("%d ", fd)
-		}
-		fmt.Println()
-	}
-
-	done := make(chan struct{})
-
-	var lastEvent *writeEvent
-	var lastDataStr string
-	var repeatCount int
-
-	// Process events
-	go func() {
-		defer close(done)
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				record, err := rd.Read()
-				if err != nil {
-					if err == perf.ErrClosed {
-						return
-					}
-					fmt.Fprintf(os.Stderr, "Error reading perf buffer: %v\n", err)
-					time.Sleep(100 * time.Millisecond)
-					continue
-				}
-
-				if record.LostSamples != 0 {
-					fmt.Printf("Lost %d samples\n", record.LostSamples)
-					continue
-				}
-
-				var event writeEvent
-				if err := binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &event); err != nil {
-					fmt.Fprintf(os.Stderr, "Failed to parse event: %v\n", err)
-					continue
-				}
-
-				// Apply FD filter
-				if !showAll && !fdFilter[event.FD] {
-					continue
-				}
-
-				// Determine if stdout/stderr or other fd
-				fdType := fdString(event.FD)
-
-				// Format the data
-				data := event.Data[:event.DataLen]
-				dataStr := formatData(data)
-
-				// Check if we should skip binary data
-				if skipBinary && !isPrintable(data) {
-					continue
-				}
-
-				if suppressRepeats && lastEvent != nil &&
-					lastEvent.FD == event.FD &&
-					lastDataStr == dataStr {
-					repeatCount++
-					continue
-				}
-
-				// If we were accumulating repeats, show the count
-				if repeatCount > 0 {
-					fmt.Printf("[PID %d, %s] Last message repeated %d times\n",
-						lastEvent.PID, fdString(lastEvent.FD), repeatCount)
-					repeatCount = 0
-				}
-
-				fmt.Printf("[PID %d, %s] %s\n", event.PID, fdType, dataStr)
-
-				if lastEvent == nil {
-					lastEvent = &writeEvent{}
-				}
-				*lastEvent = event
-				lastDataStr = dataStr
-			}
-		}
-	}()
-
-	<-sig
-	fmt.Println("\nExiting...")
-
-	signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
-
-	cancel()
-	rd.Close()
-
-	select {
-	case <-done:
-
-	case <-time.After(2 * time.Second):
-		fmt.Println("Timed out waiting for cleanup, forcing exit")
+	if _, err := p.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error running TUI: %v\n", err)
+		os.Exit(1)
 	}
 }
 
@@ -229,15 +94,13 @@ func formatData(data []byte) string {
 		return "<empty>"
 	}
 
-	// Check if data contains null bytes but is otherwise printable
 	nullByteIndex := bytes.IndexByte(data, 0)
 	containsNullByte := nullByteIndex >= 0
 
-	// If the data is all printable ASCII or standard whitespace (except perhaps null bytes), show as string
 	isPrintable := true
 	for _, b := range data {
 		if b == 0 {
-			continue // Skip null bytes for printability check
+			continue
 		}
 		if b != '\n' && b != '\r' && b != '\t' && !unicode.IsPrint(rune(b)) {
 			isPrintable = false
@@ -246,12 +109,10 @@ func formatData(data []byte) string {
 	}
 
 	if isPrintable {
-		// If it contains null bytes, truncate at first null
 		if containsNullByte {
 			data = data[:nullByteIndex]
 		}
 
-		// Truncate trailing nulls and format line endings
 		cleanData := bytes.TrimRight(data, "\x00")
 		formattedData := strings.ReplaceAll(string(cleanData), "\n", "\\n")
 		formattedData = strings.ReplaceAll(formattedData, "\r", "\\r")
@@ -259,7 +120,6 @@ func formatData(data []byte) string {
 		return formattedData
 	}
 
-	// For binary data, show hex dump
 	maxLen := 32
 	if len(data) > maxLen {
 		return fmt.Sprintf("%s... (%d bytes total)", hex.Dump(data[:maxLen]), len(data))
@@ -267,7 +127,6 @@ func formatData(data []byte) string {
 	return hex.Dump(data)
 }
 
-// isPrintable checks if the data appears to be text rather than binary
 func isPrintable(data []byte) bool {
 	if len(data) == 0 {
 		return true
@@ -283,7 +142,6 @@ func isPrintable(data []byte) bool {
 	return float64(printableCount)/float64(len(data)) > 0.9
 }
 
-// fdString returns a descriptive name for a file descriptor
 func fdString(fd uint32) string {
 	switch fd {
 	case 0:
@@ -297,11 +155,9 @@ func fdString(fd uint32) string {
 	}
 }
 
-// showExistingLogs displays existing content from process file descriptors
 func showExistingLogs(pid int, fdFilter map[uint32]bool, showAll bool, tailLines int, skipBinary bool) {
 	fmt.Printf("Reading existing file descriptors for PID %d:\n", pid)
 
-	// Read /proc/PID/fd directory to get all open file descriptors
 	fdDir := fmt.Sprintf("/proc/%d/fd", pid)
 	entries, err := os.ReadDir(fdDir)
 	if err != nil {
@@ -317,19 +173,16 @@ func showExistingLogs(pid int, fdFilter map[uint32]bool, showAll bool, tailLines
 
 		fd := uint32(fdNum)
 
-		// Skip if not in our filter
 		if !showAll && !fdFilter[fd] {
 			continue
 		}
 
-		// Get file info to determine if it's a regular file
 		fdPath := filepath.Join(fdDir, entry.Name())
 		linkTarget, err := os.Readlink(fdPath)
 		if err != nil {
 			continue
 		}
 
-		// Skip if not a regular file or pipe
 		if !strings.HasPrefix(linkTarget, "/") && !strings.Contains(linkTarget, "pipe") {
 			continue
 		}
@@ -337,7 +190,6 @@ func showExistingLogs(pid int, fdFilter map[uint32]bool, showAll bool, tailLines
 		fmt.Printf("\n--- Contents of %s (FD %d) ---\n", linkTarget, fd)
 
 		if strings.HasPrefix(linkTarget, "/") {
-			// For regular files
 			fileContent, err := os.ReadFile(linkTarget)
 			if err != nil {
 				fmt.Printf("Error reading file: %v\n", err)
