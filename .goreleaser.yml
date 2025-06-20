@@ -17,6 +17,11 @@ builds:
       - arm64
     ldflags:
       - -s -w
+    overrides:
+      - goos: linux
+        goarch: arm64
+        env:
+          - CC=aarch64-linux-gnu-gcc
 
 archives:
   - id: kubeglass-archive
