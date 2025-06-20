@@ -30,6 +30,9 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
+      - name: Install arm64 cross-compiler
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+
       - name: Install eBPF/C build dependencies
         run: |
           sudo apt-get update
