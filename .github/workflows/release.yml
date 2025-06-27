@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   goreleaser:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout code
@@ -30,23 +30,43 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Install arm64 cross-compiler
-        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+      - name: Install cross-compilers and musl tools
+        run: |
+          sudo apt-get update
+          # Install musl tools for static linking
+          sudo apt-get install -y musl-tools musl-dev
+          # Install ARM64 musl cross-compiler
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          # Download and install musl cross-compiler for ARM64
+          wget https://musl.cc/aarch64-linux-musl-cross.tgz
+          sudo tar -xzf aarch64-linux-musl-cross.tgz -C /opt
+          echo "/opt/aarch64-linux-musl-cross/bin" >> $GITHUB_PATH
+          rm aarch64-linux-musl-cross.tgz
 
       - name: Install eBPF/C build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential clang llvm libelf-dev linux-headers-$(uname -r) linux-libc-dev libbpf-dev
+          sudo apt-get install -y --no-install-recommends build-essential clang llvm libelf-dev linux-headers-generic linux-libc-dev libbpf-dev
       
-      - name: Debug Headers
+      - name: Setup Kernel Headers and BPF Environment
         run: |
-          echo "Kernel version: $(uname -r)"
-          echo "Architecture: $(dpkg --print-architecture)"
-          echo "Checking for header locations:"
-          find /usr/include -name "types.h" | grep -E 'linux|asm'
-          find /usr/src -name "types.h" | grep -E 'linux|asm'
-          echo "Content of /usr/include/linux/types.h:"
-          head -n 10 /usr/include/linux/types.h || echo "File not found"
+          echo "Setting up kernel headers environment..."
+          # Find the installed kernel headers
+          KERNEL_VERSION=$(ls /usr/src/ | grep linux-headers | grep -v generic | head -1)
+          echo "Using kernel headers: $KERNEL_VERSION"
+          echo "KERNEL_HEADERS_PATH=/usr/src/$KERNEL_VERSION" >> $GITHUB_ENV
+          
+          # Set comprehensive BPF compilation flags
+          BPF_CFLAGS="-O2 -g -Wall -Werror"
+          BPF_CFLAGS="$BPF_CFLAGS -I/usr/src/$KERNEL_VERSION/include"
+          BPF_CFLAGS="$BPF_CFLAGS -I/usr/src/$KERNEL_VERSION/include/uapi"
+          BPF_CFLAGS="$BPF_CFLAGS -I/usr/src/$KERNEL_VERSION/arch/x86/include"
+          BPF_CFLAGS="$BPF_CFLAGS -I/usr/src/$KERNEL_VERSION/arch/x86/include/uapi"
+          BPF_CFLAGS="$BPF_CFLAGS -I/usr/src/$KERNEL_VERSION/arch/x86/include/generated"
+          BPF_CFLAGS="$BPF_CFLAGS -I/usr/include"
+          BPF_CFLAGS="$BPF_CFLAGS -I/usr/include/x86_64-linux-gnu"
+          BPF_CFLAGS="$BPF_CFLAGS -I/usr/include/bpf"
+          echo "BPF_CFLAGS=$BPF_CFLAGS" >> $GITHUB_ENV
 
       - name: Create asm symlinks
         run: |
@@ -70,5 +90,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           BPF_CLANG: "/usr/local/bin/clang-wrapper"
-          BPF_CFLAGS: "-I/usr/include"
+          BPF_CFLAGS: ${{ env.BPF_CFLAGS }}
           CGO_ENABLED: "1" 
