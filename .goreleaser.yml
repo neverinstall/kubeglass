@@ -29,7 +29,7 @@ builds:
         goarch: arm64
         env:
           - CGO_ENABLED=1
-          - CC=zig cc -target aarch64-linux-musl
+          - CC=zig cc -target aarch64-linux-musl -isystem /usr/include/aarch64-linux-gnu
 
 archives:
   - id: kubeglass-archive

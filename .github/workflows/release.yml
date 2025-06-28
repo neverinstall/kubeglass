@@ -35,10 +35,24 @@ jobs:
         with:
           version: "0.11.0"
 
-      - name: Install eBPF/C build dependencies
+      - name: Install host and cross-compilation dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential clang llvm libelf-dev linux-headers-generic linux-libc-dev libbpf-dev
+          # Add arm64 architecture for cross-compilation
+          sudo dpkg --add-architecture arm64
+          # Install dependencies for host (amd64) and target (arm64)
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            clang \
+            llvm \
+            libelf-dev \
+            libelf-dev:arm64 \
+            linux-headers-generic \
+            linux-libc-dev \
+            libbpf-dev \
+            zlib1g-dev \
+            zlib1g-dev:arm64
       
       - name: Setup Kernel Headers and BPF Environment
         run: |
