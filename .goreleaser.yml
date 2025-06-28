@@ -10,26 +10,15 @@ builds:
     binary: kubeglass
     env:
       - CGO_ENABLED=1
+      - CC=zig cc -target x86_64-linux-musl
     goos:
       - linux
     goarch:
       - amd64
-      - arm64
     ldflags:
       - -s -w
       - -linkmode external
       - -extldflags "-static -lelf -lz"
-    overrides:
-      - goos: linux
-        goarch: amd64
-        env:
-          - CGO_ENABLED=1
-          - CC=zig cc -target x86_64-linux-musl
-      - goos: linux
-        goarch: arm64
-        env:
-          - CGO_ENABLED=1
-          - CC=zig cc -target aarch64-linux-musl -isystem /usr/include/aarch64-linux-gnu
 
 archives:
   - id: kubeglass-archive

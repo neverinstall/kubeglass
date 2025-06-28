@@ -27,36 +27,23 @@ jobs:
           go-version: '1.21'
           cache: true
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Zig
         uses: goto-bus-stop/setup-zig@v2
         with:
           version: "0.11.0"
 
-      - name: Install host and cross-compilation dependencies
+      - name: Install build dependencies
         run: |
-          # Add arm64 architecture for cross-compilation
-          sudo dpkg --add-architecture arm64
-          # Add the 'ports' repository which contains arm64 packages
-          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse" | sudo tee /etc/apt/sources.list.d/arm64-ports.list
-          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list.d/arm64-ports.list
-          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list.d/arm64-ports.list
-          # Update package lists for all architectures
           sudo apt-get update
-          # Install dependencies for host (amd64) and target (arm64)
           sudo apt-get install -y --no-install-recommends \
             build-essential \
             clang \
             llvm \
             libelf-dev \
-            libelf-dev:arm64 \
             linux-headers-generic \
             linux-libc-dev \
             libbpf-dev \
-            zlib1g-dev \
-            zlib1g-dev:arm64
+            zlib1g-dev
       
       - name: Setup Kernel Headers and BPF Environment
         run: |
