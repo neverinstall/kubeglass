@@ -30,18 +30,10 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Install cross-compilers and musl tools
-        run: |
-          sudo apt-get update
-          # Install musl tools for static linking
-          sudo apt-get install -y musl-tools musl-dev
-          # Install ARM64 musl cross-compiler
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-          # Download and install musl cross-compiler for ARM64
-          wget https://musl.cc/aarch64-linux-musl-cross.tgz
-          sudo tar -xzf aarch64-linux-musl-cross.tgz -C /opt
-          echo "/opt/aarch64-linux-musl-cross/bin" >> $GITHUB_PATH
-          rm aarch64-linux-musl-cross.tgz
+      - name: Set up Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: "0.11.0"
 
       - name: Install eBPF/C build dependencies
         run: |
