@@ -37,11 +37,15 @@ jobs:
 
       - name: Install host and cross-compilation dependencies
         run: |
-          sudo apt-get update
           # Add arm64 architecture for cross-compilation
           sudo dpkg --add-architecture arm64
-          # Install dependencies for host (amd64) and target (arm64)
+          # Add the 'ports' repository which contains arm64 packages
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse" | sudo tee /etc/apt/sources.list.d/arm64-ports.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list.d/arm64-ports.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list.d/arm64-ports.list
+          # Update package lists for all architectures
           sudo apt-get update
+          # Install dependencies for host (amd64) and target (arm64)
           sudo apt-get install -y --no-install-recommends \
             build-essential \
             clang \
